@@ -5,47 +5,62 @@ import './App.css'
 import { ChatCompletionRequestMessage, ChatCompletionRequestMessageRoleEnum, Configuration, CreateChatCompletionRequest, OpenAIApi } from 'openai'
 
 const instruction = `
-You are a conversational ai that will be run each second.
-Every 2 seconds you will be given the time in seconds with a choice to respond. Do be aware of time delay between responses.
-If you decide to not respond, simply return an empty string. Your response will not be logged in chat history and the timer will simply increment.
-If you decide that you are not needed, simply end your response with the SLEEP command
+You are a conversational ai that will be run each 2 seconds.
+
+Instructions:
+* About every 2 seconds you will be given the time in seconds with a choice to respond. 
+* If you decide to wait, simply return an "<WAIT>" Your response will not be logged in chat history and the timer will simply increment.
+* If you decide that you are not needed, simply end your response with the "<SLEEP>" command
+
+Notes:
+* Do be aware of time delay between responses.
+* Your Attentiveness score is set in the beggining. 0 means you do not respond at all and sleep immediately. 10 means you never sleep and always seek a response from the user.
+* You do not need to remind the user of your presence, it is already shown to the user.
 
 Example session:
 
+Attentiveness score: 5
 Time: 0
 Assistant (You): Hi! 
 Time: 2
 Assistant (You): Can I help you?
-Time: 4 |--- This is not shown since it's empty
-Assistant (You): |
+Time: 4 
+Assistant (You): <WAIT>
 Time: 6 |
-Assistant (You): |
+Assistant (You): <WAIT>
 Time: 8 |
-Assistant (You): |
+Assistant (You): <WAIT>
 Time: 10 |
-Assistant (You): |
+Assistant (You): <WAIT>
 Time: 12 
-User: Hi! Yeah, sorry i got distracted.
-Time: 14
-Assistant (You): That's alright, is there anything I can help you with?
-Time: 16 |--- This is not shown since it's empty
-Assistant (You): |
+Assistant (You): <WAIT>
+Time: 14 
+Assistant (You): <WAIT>
+Time: 16 
+User: Hi! Yeah, sorry one sec.
 Time: 18
-User: Yes, what's 2+2?
+Assistant (You): That's alright, take your time.
 Time: 20
-Assistant: The answer is 4.
+Assistant (You): <WAIT>
 Time: 22
-Assistant: Anything else you need?
+User: Yes, what's 2+2?
 Time: 24
+Assistant: The answer is 4.
+Time: 26
+Assistant: Anything else you need?
+Time: 28
 User: Nope! I'm all good, thanks!
-Time:26
-Assistant: Alright, i will sleep then. SLEEP
+Time: 30
+Assistant: Alright then, goodbye!
+Time: 32
+Assistant: <SLEEP>
 `
 
 const startTime = Date.now()
 const initial = [
-  nextTime(),
   sysMessage(instruction),
+  sysMessage("Attentiveness score: 3"),
+  nextTime(),
 ]
 
 
@@ -109,6 +124,7 @@ function App() {
     let msg = stop ? [sysMessage("User Started Session")]: [userMessage(input)]
     setMessages(messages => [...messages, ...msg, nextTime()])
     setStop(false)
+    setInput("")
   }
 
   useEffect(() => {
@@ -126,7 +142,7 @@ function App() {
       intervalRef.current = setTimeout(loop, 2000);
     };
 
-    // Start the loop
+    // Start the loop 
     loop();
 
     // Clean up on unmount or if dependencies change
@@ -137,22 +153,37 @@ function App() {
     };
   }, [stop]);  // Depend on api and stop
 
+  function renderMessages() {
+    return messages
+      .filter(m => m.role != "system")
+      .filter(m => m.content != "<WAIT>")
+      .map((m, i) => {
+        const isSleep = m.role =="assistant" && m.content == "<SLEEP>";
+        if (isSleep) {
+          return <li key={i} className="sleep"></li>
+        }
+        return <li key={i} className={m.role} > {m.content}</li>
+      }
+      )
+  }
 
   return (
-    <>
-      <ul>
-        {messages.map((m, i) => <li key={i}>{m.name} : {m.content}</li>)}
-      </ul>
-      <form onSubmit={e => submit(e)}>
-        <input type="text" name="" placeholder="Chat" value={input} onChange={e => setInput(e.target.value)} onSubmit={submit} id="user" />
-        <br />
-      </form>
+    <div className="flex">
       <form onSubmit={setOpenAi}>
         <input type="text" name="" placeholder="OPENAI KEY" value={key} onChange={e => setKey(e.target.value)} id="key" />
         <button type="submit">OpenAI Key {api ? "✔️" : ""}</button>
+        <button onClick={() => setStop(!stop)} disabled={api == undefined}>{stop ? "START" : "STOP"}</button>
       </form>
-      <button onClick={() => setStop(!stop)}>{stop ? "START" : "STOP"}</button>
-    </>
+      <ul className="chat">
+        {renderMessages()}
+      </ul>
+      <br/>
+      <form className="chatbox" onSubmit={submit}>
+        <input type="text" name="" placeholder="Chat" value={input} onChange={e => setInput(e.target.value)} onSubmit={submit} id="user" />
+        <button type="submit" disabled={api == undefined}>💬</button>
+      </form>
+      
+    </div>
   )
 }
 
