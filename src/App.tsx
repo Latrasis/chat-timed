@@ -160,7 +160,7 @@ function App() {
       .map((m, i) => {
         const isSleep = m.role =="assistant" && m.content == "<SLEEP>";
         if (isSleep) {
-          return <li key={i} className="sleep"></li>
+          return <li key={i} className="sleep">Session ended</li>
         }
         return <li key={i} className={m.role} > {m.content}</li>
       }
